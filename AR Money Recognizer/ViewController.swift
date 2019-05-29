@@ -10,7 +10,7 @@ import UIKit
 import SceneKit
 import ARKit
 
-class ViewController: UIViewController, ARSCNViewDelegate {
+class ViewController: UIViewController {
 
     @IBOutlet var sceneView: ARSCNView!
     
@@ -23,21 +23,13 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         // Show statistics such as fps and timing information
         sceneView.showsStatistics = true
         
-        // Create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
-        
-        // Set the scene to the view
-        sceneView.scene = scene
+        sceneView.debugOptions = [.showFeaturePoints]
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        // Create a session configuration
-        let configuration = ARWorldTrackingConfiguration()
-
-        // Run the view's session
-        sceneView.session.run(configuration)
+        configureARImageTracking()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -47,29 +39,66 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         sceneView.session.pause()
     }
 
-    // MARK: - ARSCNViewDelegate
+}
+
+extension ViewController {
     
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        let node = SCNNode()
-     
-        return node
+    func configureARImageTracking() {
+        // Create a session configuration
+        let configuration = ARWorldTrackingConfiguration()
+        if let imageTrackingReference = ARReferenceImage.referenceImages(inGroupNamed: "Money Set", bundle: Bundle.main) {
+            configuration.detectionImages = imageTrackingReference
+            configuration.maximumNumberOfTrackedImages = 2
+        } else {
+            print("Error: Failed to get image tracking referencing image from bundle")
+        }
+        // Run the view's session
+        sceneView.session.run(configuration)
     }
-*/
     
-    func session(_ session: ARSession, didFailWithError error: Error) {
-        // Present an error message to the user
+    func add3DText(_ node: SCNNode, for anchor: ARImageAnchor) {
         
+        guard let name = anchor.referenceImage.name else { return }
+        
+        let text = createTextNode(string: name)
+        
+        text.isHidden = false
+        text.runAction(SCNAction.sequence([
+            SCNAction.wait(duration: 1.0),
+            SCNAction.scale(to: 0.01, duration: 0.5)
+            ]))
+        
+        node.addChildNode(text)
     }
     
-    func sessionWasInterrupted(_ session: ARSession) {
-        // Inform the user that the session has been interrupted, for example, by presenting an overlay
+    func createTextNode(string: String) -> SCNNode {
         
+        let text = SCNText(string: string, extrusionDepth: 0.1)
+        text.font = UIFont.systemFont(ofSize: 1.0)
+        text.flatness = 0.01
+        text.firstMaterial?.diffuse.contents = UIColor.white
+        
+        let textNode = SCNNode(geometry: text)
+        
+        
+        let fontSize = Float(0.04)
+        textNode.scale = SCNVector3(fontSize, fontSize, fontSize)
+        textNode.eulerAngles.x = -.pi / 2
+        textNode.eulerAngles.y = (-.pi / 2) * 2
+        textNode.position.z = 0.05
+        
+        return textNode
+    }
+}
+
+extension ViewController: ARSCNViewDelegate {
+    
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+        if let imageAnchor =  anchor as? ARImageAnchor {
+            print("Image detected \(imageAnchor.name!)")
+            
+            add3DText(node, for: imageAnchor)
+        }
     }
     
-    func sessionInterruptionEnded(_ session: ARSession) {
-        // Reset tracking and/or remove existing anchors if consistent tracking is required
-        
-    }
 }
